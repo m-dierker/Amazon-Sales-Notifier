@@ -1,0 +1,14 @@
+## Compiled JavaScript files
+**/*.js
+**/*.js.map
+
+# Typescript v1 declaration files
+typings/
+
+# Node
+node_modules/
+.yalc/
+yalc.lock
+
+# Keys
+.env
