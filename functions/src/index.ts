@@ -6,13 +6,10 @@ import {Client} from 'discord.js';
 import * as functions from 'firebase-functions';
 const admin = require('firebase-admin');
 admin.initializeApp();
-// @ts-ignore
 const db: FirebaseFirestore.Firestore = admin.firestore();
 
 const DATA_COLLECTION = 'data';
 const DATA_DOC = 'data';
-// @ts-ignore
-const START_DATE = '2020-01-01T00:00:00Z';
 
 let mws_ : MWS;
 let discordClient_: Client;
