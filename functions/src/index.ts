@@ -25,6 +25,7 @@ export const checkForOrders = functions.https.onRequest(async (req, res) => {
         MarketplaceId: [amazonMarketplaces.US.id],
         LastUpdatedAfter: new Date('2020-01-01T00:04:45.983Z'),
     });
+    console.log('new orders', JSON.stringify(newOrders));
 
     const diff = getOrderDiffs(data.savedOrders || [], newOrders.Orders);
     const msg = await getOrderMsg(diff);

@@ -29,7 +29,7 @@ DISCORD_OWNER_ID=a number
 
 ## Running & Deploying
 
-Run locally: `firebase emulators:start` and use the HTTP link listed.
+Run locally: `firebase emulators:start` and use the HTTP link listed. When you make changes, use `npm run build`. There is probably a way to automate the build portion but I haven't done it yet.
 
 Deploy to prod: `firebase deploy --only functions`.
 
