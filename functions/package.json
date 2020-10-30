@@ -14,7 +14,7 @@
   },
   "main": "lib/index.js",
   "dependencies": {
-    "@scaleleap/amazon-mws-api-sdk": "file:.yalc/@scaleleap/amazon-mws-api-sdk",
+    "@scaleleap/amazon-mws-api-sdk": "^1.9.11",
     "@types/ws": "^7.2.6",
     "discord.js": "^12.3.1",
     "dotenv": "^8.2.0",
