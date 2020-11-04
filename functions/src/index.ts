@@ -34,7 +34,7 @@ export const checkForOrders = functions.https.onRequest(async (req, res) => {
 
   const [newOrders] = await mws.orders.listOrders({
     MarketplaceId: [amazonMarketplaces.US.id],
-    LastUpdatedAfter: new Date("2020-01-01T00:04:45.983Z"),
+    LastUpdatedAfter: new Date("2020-11-01T00:04:45.983Z"),
   });
   console.log("new orders", JSON.stringify(newOrders));
 
@@ -172,6 +172,7 @@ async function getOrderString(order: Order): Promise<string> {
     AmazonOrderId: order.AmazonOrderId,
   });
   const itemsStr = items.OrderItems.map((item) => item.Title).join(", ");
+  // const itemsStr = "order";
   let orderStr = "";
   if (order.OrderTotal) {
     orderStr += `\$${order.OrderTotal.Amount}: `;
