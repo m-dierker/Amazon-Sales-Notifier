@@ -10,41 +10,91 @@ import {
 } from "@scaleleap/amazon-mws-api-sdk";
 import { Client } from "discord.js";
 import * as functions from "firebase-functions";
+import moment = require("moment");
+
 const admin = require("firebase-admin");
 admin.initializeApp();
 const db: FirebaseFirestore.Firestore = admin.firestore();
 
 const DATA_COLLECTION = "data";
 const DATA_DOC = "data";
-/**  */
+/** Discord has a message size limit that can happen if the app breaks and there are lots of updates. */
 const DISCORD_CHARACTER_LIMIT = 2000;
 
 let mws_: MWS;
 let discordClient_: Client;
 
 export const checkForOrders = functions.https.onRequest(async (req, res) => {
-  const now = new Date();
   const mws = getMws();
   const data: SaveData =
     ((await (
       await db.collection(DATA_COLLECTION).doc(DATA_DOC).get()
     ).data()) as SaveData) || {};
-  // @ts-ignore
-  const lastUpdateTime = data.lastUpdateTime || new Date(0);
+  // Let the code below assume this exists.
+  if (!data.deletedOrders) {
+    data.deletedOrders = {};
+  }
 
-  const [newOrders] = await mws.orders.listOrders({
+  // Arbitrarily fetch the last few days of data.
+  const now = moment();
+  const threeDaysAgo = now.subtract(3, "days");
+
+  const [mwsOrders] = await mws.orders.listOrders({
     MarketplaceId: [amazonMarketplaces.US.id],
-    LastUpdatedAfter: new Date("2020-11-01T00:04:45.983Z"),
+    LastUpdatedAfter: threeDaysAgo.toDate(),
   });
-  console.log("new orders", JSON.stringify(newOrders));
 
-  const diff = getOrderDiffs(data.savedOrders || [], newOrders.Orders);
+  const diff = getOrderDiffs(data.savedOrders || [], mwsOrders.Orders);
+
+  // Deleted orders get stored in the DB for a while since Amazon sometimes
+  // "deletes" legitimate orders before shipping.
+  for (const deletedOrder of diff.removed) {
+    if (data.deletedOrders[deletedOrder.AmazonOrderId]) {
+      console.warn(`Duplicate deleted order: ${deletedOrder.AmazonOrderId}`);
+      continue;
+    }
+    data.deletedOrders[deletedOrder.AmazonOrderId] = deletedOrder;
+    console.log(
+      `Adding deleted order ${deletedOrder.AmazonOrderId} to database`
+    );
+  }
+  // Deleted orders are no longer logged for now.
+  diff.removed = [];
+
+  // Silently cancel any "new" orders that were just deleted.
+  let filteredNewOrders: Order[] = [];
+  for (const newOrder of diff.added) {
+    if (data.deletedOrders[newOrder.AmazonOrderId]) {
+      console.log(
+        `Muting order that was deleted and came back ${newOrder.AmazonOrderId}`
+      );
+      delete data.deletedOrders[newOrder.AmazonOrderId];
+      continue;
+    }
+    filteredNewOrders.push(newOrder);
+  }
+  diff.added = filteredNewOrders;
+
+  // Remove any deleted orders that were subsequently shipped.
+  for (const shippedOrder of diff.shipped) {
+    if (data.deletedOrders[shippedOrder.AmazonOrderId]) {
+      console.log(
+        `Removing deleted order that actually shipped ${shippedOrder.AmazonOrderId}`
+      );
+      delete data.deletedOrders[shippedOrder.AmazonOrderId];
+    }
+  }
+
+  // TODO(mdierker): Potentially purge old deleted orders. data.deletedOrders is unbounded
+  // for orders that are actually deleted.
+
   const msg = await getOrderMsg(diff);
   await sendDiscordMsg(msg);
 
   const newData: SaveData = {
-    lastUpdateTime: now,
-    savedOrders: newOrders.Orders,
+    lastUpdateTime: now.toDate(),
+    savedOrders: mwsOrders.Orders,
+    deletedOrders: data.deletedOrders,
   };
   await db.collection(DATA_COLLECTION).doc(DATA_DOC).set(newData);
 
@@ -178,6 +228,12 @@ async function getOrderString(order: Order): Promise<string> {
     orderStr += `\$${order.OrderTotal.Amount}: `;
   }
   orderStr += itemsStr;
+  if (order.ShippingAddress?.City) {
+    orderStr += ` in ${order.ShippingAddress.City}, ${order.ShippingAddress.StateOrRegion}`;
+    if (order.ShippingAddress.CountryCode !== "US") {
+      orderStr += `, ${order.ShippingAddress.CountryCode}`;
+    }
+  }
   return orderStr;
 }
 
@@ -190,4 +246,5 @@ export interface OrderDiff {
 export interface SaveData {
   savedOrders: Order[];
   lastUpdateTime: Date;
+  deletedOrders: { [key: string]: Order };
 }
