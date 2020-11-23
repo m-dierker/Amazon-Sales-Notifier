@@ -162,16 +162,21 @@ function getOrderDiffs(oldOrders: Order[], newOrders: Order[]) {
   };
 
   for (const [orderId, newOrder] of newOrdersById.entries()) {
-    if (!oldOrdersById.has(orderId)) {
-      diff.added.push(newOrder);
-    } else {
-      const oldOrder = oldOrdersById.get(orderId)!;
+    if (oldOrdersById.has(orderId)) {
+      const oldOrder = oldOrdersById.get(orderId);
+      // If an old order has shipped, the user was already notified.
       if (
-        newOrder.OrderStatus === OrderStatusEnum.Shipped &&
-        oldOrder.OrderStatus !== OrderStatusEnum.Shipped
+        oldOrder?.OrderStatus !== OrderStatusEnum.Shipped &&
+        newOrder.OrderStatus === OrderStatusEnum.Shipped
       ) {
         diff.shipped.push(newOrder);
       }
+      continue;
+    }
+    if (newOrder.OrderStatus === OrderStatusEnum.Shipped) {
+      diff.shipped.push(newOrder);
+    } else {
+      diff.added.push(newOrder);
     }
   }
 
